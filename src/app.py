@@ -427,8 +427,8 @@ with tab_camp:
             # Peso 3: Participação Relativa
             w3 = (total / max_jogos * 20) if max_jogos > 0 else 0.0
 
-            # Peso 4: Momento Recente (últimas 5 partidas)
-            ultimas = s['jogos'].sort_values('Data', ascending=False).head(5)
+            # Peso 4: Momento Recente (últimas 30 partidas)
+            ultimas = s['jogos'].sort_values('Data', ascending=False).head(30)
             n = len(ultimas)
             wins_rec = len(ultimas[ultimas['Vencedor'] == jogador])
             w4 = (wins_rec / n * 20) if n > 0 else 0.0
@@ -539,10 +539,10 @@ with tab_camp:
             'emoji': '🔥',
             'titulo': 'Peso 4 — Momento Recente',
             'info': (
-                "Mede a **forma atual** do jogador com base nas últimas 5 partidas. "
+                "Mede a **forma atual** do jogador com base nas últimas 30 partidas. "
                 "Evita que resultados antigos congelem o ranking e dá dinamismo à disputa — "
                 "quem estiver em alta sobe, quem estiver em baixa cai. "
-                "\n\n**Fórmula:** (vitórias nas últimas 5 partidas ÷ 5) × 20"
+                "\n\n**Fórmula:** (vitórias nas últimas 30 partidas ÷ 30) × 20"
             ),
             'cor': 'Reds'
         },
