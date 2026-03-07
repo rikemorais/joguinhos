@@ -18,7 +18,12 @@ SHEET_NAME = "efootball - Dados"
 def load_data():
     url = f"https://docs.google.com/spreadsheets/d/{SHEET_ID}/gviz/tq?tqx=out:csv&sheet={quote(SHEET_NAME)}"
     df = pd.read_csv(url)
-    df['Data'] = pd.to_datetime(df['Data'])
+    # Remove espaços extras dos nomes das colunas
+    df.columns = df.columns.str.strip()
+    if 'Data' not in df.columns:
+        st.error(f"Coluna 'Data' não encontrada. Colunas disponíveis: {list(df.columns)}")
+        st.stop()
+    df['Data'] = pd.to_datetime(df['Data'], dayfirst=True)
     return df
 
 df = load_data()
