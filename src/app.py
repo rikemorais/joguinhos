@@ -47,12 +47,13 @@ col4.metric("Empates", empates)
 st.markdown("---")
 
 # Tabs principais
-tab1, tab2, tab3, tab4, tab5 = st.tabs([
+tab1, tab2, tab3, tab4, tab5, tab_camp = st.tabs([
     "📊 Visão Geral",
     "🏆 Rankings",
     "📈 Estatísticas por Jogador",
     "⚔️ Confrontos Diretos",
-    "📅 Histórico"
+    "📅 Histórico",
+    "🥇 Campeonato"
 ])
 
 with tab1:
@@ -371,6 +372,215 @@ with tab5:
     df_display = df_filtrado[['Data', 'Partida', 'Nome 1', 'Time 1', 'Placar 1', 'Nome 2', 'Time 2', 'Placar 2', 'Vencedor']].copy()
     df_display['Data'] = df_display['Data'].dt.strftime('%d/%m/%Y')
     st.dataframe(df_display, use_container_width=True, hide_index=True)
+
+with tab_camp:
+    @st.cache_data(ttl=300)
+    def calcular_ranking(_df):
+        jogadores = sorted(list(set(_df['Nome 1'].unique()) | set(_df['Nome 2'].unique())))
+        stats = {}
+
+        for jogador in jogadores:
+            jogos = _df[(_df['Nome 1'] == jogador) | (_df['Nome 2'] == jogador)]
+            total = len(jogos)
+            vitorias = len(jogos[jogos['Vencedor'] == jogador])
+            gols_marcados = (
+                jogos[jogos['Nome 1'] == jogador]['Placar 1'].sum() +
+                jogos[jogos['Nome 2'] == jogador]['Placar 2'].sum()
+            )
+            gols_sofridos = (
+                jogos[jogos['Nome 1'] == jogador]['Placar 2'].sum() +
+                jogos[jogos['Nome 2'] == jogador]['Placar 1'].sum()
+            )
+            stats[jogador] = {
+                'total': total,
+                'vitorias': vitorias,
+                'saldo_gols': int(gols_marcados - gols_sofridos),
+                'jogos': jogos
+            }
+
+        max_jogos = max((stats[j]['total'] for j in jogadores), default=1)
+        saldos = [stats[j]['saldo_gols'] for j in jogadores]
+        min_saldo, max_saldo = min(saldos), max(saldos)
+
+        ranking = []
+        for jogador in jogadores:
+            s = stats[jogador]
+            total = s['total']
+            vitorias = s['vitorias']
+
+            # Peso 1: Taxa de Vitórias
+            w1 = (vitorias / total * 20) if total > 0 else 0.0
+
+            # Peso 2: Head-to-Head (média das taxas de vitória contra cada adversário)
+            outros = [j for j in jogadores if j != jogador]
+            h2h_rates = []
+            for oponente in outros:
+                conf = _df[
+                    ((_df['Nome 1'] == jogador) & (_df['Nome 2'] == oponente)) |
+                    ((_df['Nome 1'] == oponente) & (_df['Nome 2'] == jogador))
+                ]
+                if len(conf) > 0:
+                    wins_vs = len(conf[conf['Vencedor'] == jogador])
+                    h2h_rates.append(wins_vs / len(conf))
+            w2 = (sum(h2h_rates) / len(h2h_rates) * 20) if h2h_rates else 0.0
+
+            # Peso 3: Participação Relativa
+            w3 = (total / max_jogos * 20) if max_jogos > 0 else 0.0
+
+            # Peso 4: Momento Recente (últimas 5 partidas)
+            ultimas = s['jogos'].sort_values('Data', ascending=False).head(5)
+            n = len(ultimas)
+            wins_rec = len(ultimas[ultimas['Vencedor'] == jogador])
+            w4 = (wins_rec / n * 20) if n > 0 else 0.0
+
+            # Peso 5: Saldo de Gols (normalizado 0–20)
+            saldo = s['saldo_gols']
+            if max_saldo != min_saldo:
+                w5 = (saldo - min_saldo) / (max_saldo - min_saldo) * 20
+            else:
+                w5 = 10.0
+
+            ranking.append({
+                'Jogador': jogador,
+                'Jogos': total,
+                'Vitórias': vitorias,
+                'Saldo': s['saldo_gols'],
+                'W1': round(w1, 1),
+                'W2': round(w2, 1),
+                'W3': round(w3, 1),
+                'W4': round(w4, 1),
+                'W5': round(w5, 1),
+                'Total': round(w1 + w2 + w3 + w4 + w5, 1)
+            })
+
+        return pd.DataFrame(ranking).sort_values('Total', ascending=False).reset_index(drop=True)
+
+    ranking_df = calcular_ranking(df)
+
+    # ── RANKING ─────────────────────────────────────────────────────────────
+    st.subheader("🏆 Ranking do Campeonato")
+
+    medals = ['🥇', '🥈', '🥉']
+    podium_cols = st.columns(min(3, len(ranking_df)))
+    for i, col in enumerate(podium_cols):
+        row = ranking_df.iloc[i]
+        col.metric(
+            label=f"{medals[i]} {row['Jogador']}",
+            value=f"{row['Total']:.1f} pts",
+            help=f"Jogos: {row['Jogos']} | Vitórias: {row['Vitórias']} | Saldo de gols: {row['Saldo']:+d}"
+        )
+
+    pos_labels = medals + [str(i) for i in range(4, len(ranking_df) + 1)]
+    tabela = ranking_df.copy()
+    tabela.insert(0, '#', pos_labels[:len(tabela)])
+    st.dataframe(
+        tabela[['#', 'Jogador', 'W1', 'W2', 'W3', 'W4', 'W5', 'Total', 'Jogos', 'Vitórias', 'Saldo']],
+        use_container_width=True,
+        hide_index=True
+    )
+
+    fig = px.bar(
+        ranking_df.sort_values('Total'),
+        x='Total',
+        y='Jogador',
+        orientation='h',
+        color='Total',
+        color_continuous_scale='RdYlGn',
+        text='Total',
+        range_x=[0, 100]
+    )
+    fig.update_traces(textposition='outside')
+    fig.update_layout(showlegend=False, xaxis_title='Pontuação Total (max 100)')
+    st.plotly_chart(fig, use_container_width=True)
+
+    # ── DETALHAMENTO ────────────────────────────────────────────────────────
+    st.markdown("---")
+    st.subheader("📊 Detalhamento por Indicador")
+    st.caption("Cada indicador vale até 20 pontos. Clique para expandir e ver o detalhamento.")
+
+    pesos = [
+        {
+            'col': 'W1',
+            'emoji': '🎯',
+            'titulo': 'Peso 1 — Taxa de Vitórias',
+            'info': (
+                "Mede a **eficiência** do jogador: quantos % das suas partidas ele venceu. "
+                "Não depende do volume de jogos — quem jogou pouco mas ganhou muito é valorizado. "
+                "\n\n**Fórmula:** (vitórias ÷ total de jogos) × 20"
+            ),
+            'cor': 'Blues'
+        },
+        {
+            'col': 'W2',
+            'emoji': '⚔️',
+            'titulo': 'Peso 2 — Head-to-Head',
+            'info': (
+                "Mede o desempenho em **confrontos diretos** contra cada adversário do grupo. "
+                "Calcula a taxa de vitória de cada jogador contra cada oponente individualmente, "
+                "depois tira a média. Quem bate os mais fortes pontua melhor. "
+                "\n\n**Fórmula:** média das taxas de vitória vs. cada oponente × 20"
+            ),
+            'cor': 'Oranges'
+        },
+        {
+            'col': 'W3',
+            'emoji': '📅',
+            'titulo': 'Peso 3 — Participação Relativa',
+            'info': (
+                "Mede a **presença e dedicação** ao campeonato. "
+                "O jogador com mais partidas recebe 20 pontos; os demais são proporcionais. "
+                "Incentiva participação sem eliminar quem faltou em alguns dias. "
+                "\n\n**Fórmula:** (jogos do jogador ÷ máximo de jogos do grupo) × 20"
+            ),
+            'cor': 'Purples'
+        },
+        {
+            'col': 'W4',
+            'emoji': '🔥',
+            'titulo': 'Peso 4 — Momento Recente',
+            'info': (
+                "Mede a **forma atual** do jogador com base nas últimas 5 partidas. "
+                "Evita que resultados antigos congelem o ranking e dá dinamismo à disputa — "
+                "quem estiver em alta sobe, quem estiver em baixa cai. "
+                "\n\n**Fórmula:** (vitórias nas últimas 5 partidas ÷ 5) × 20"
+            ),
+            'cor': 'Reds'
+        },
+        {
+            'col': 'W5',
+            'emoji': '⚽',
+            'titulo': 'Peso 5 — Saldo de Gols',
+            'info': (
+                "Mede o **domínio** do jogador além do placar: diferença entre gols marcados e sofridos, "
+                "normalizada entre o melhor e pior saldo do grupo. "
+                "Premia quem vence com folga e penaliza quem perde por goleada. "
+                "\n\n**Fórmula:** (saldo − min_saldo) ÷ (max_saldo − min_saldo) × 20"
+            ),
+            'cor': 'Greens'
+        }
+    ]
+
+    for peso in pesos:
+        with st.expander(f"{peso['emoji']} {peso['titulo']}"):
+            st.info(peso['info'])
+
+            peso_df = ranking_df[['Jogador', peso['col']]].sort_values(peso['col'], ascending=False)
+            fig = px.bar(
+                peso_df,
+                x='Jogador',
+                y=peso['col'],
+                color=peso['col'],
+                color_continuous_scale=peso['cor'],
+                text=peso['col'],
+                range_y=[0, 22]
+            )
+            fig.update_traces(textposition='outside')
+            fig.update_layout(
+                showlegend=False,
+                yaxis_title='Pontos (max 20)',
+                xaxis_title=''
+            )
+            st.plotly_chart(fig, use_container_width=True)
 
 st.markdown("---")
 st.caption("Dashboard eFootball - Dados de 2026")
