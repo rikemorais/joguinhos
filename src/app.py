@@ -414,7 +414,9 @@ with tab_camp:
                 ]
                 if len(conf) > 0:
                     wins_vs = len(conf[conf['Vencedor'] == jogador])
-                    h2h_rates.append(wins_vs / len(conf))
+                    decisivos = len(conf[conf['Vencedor'] != 'Empate'])
+                    if decisivos > 0:
+                        h2h_rates.append(wins_vs / decisivos)
             media_vitorias = (sum(h2h_rates) / len(h2h_rates) * 100) if h2h_rates else 0.0
 
             ranking.append({
@@ -516,12 +518,13 @@ with tab_camp:
             ]
             if len(conf) > 0:
                 wins = len(conf[conf['Vencedor'] == j])
-                rate = round(wins / len(conf) * 100, 1)
-                matriz[j][oponente] = rate
-                h2h_rates.append(rate)
-            else:
-                matriz[j][oponente] = None
-
+                decisivos = len(conf[conf['Vencedor'] != 'Empate'])
+                if decisivos > 0:
+                    rate = round(wins / decisivos * 100, 1)
+                    matriz[j][oponente] = rate
+                    h2h_rates.append(rate)
+                else:
+                    matriz[j][oponente] = None
     # Tabela visual com cores
     heatmap_vals = []
     heatmap_text = []
