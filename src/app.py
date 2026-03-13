@@ -543,7 +543,7 @@ with tab_camp:
         rates = [matriz[j][op] for op in jogadores_ord if op != j and matriz[j][op] is not None]
         media = round(sum(rates) / len(rates), 1) if rates else 0.0
         row_vals.append(media)
-        row_text.append(f"**{media:.0f}%**")
+        row_text.append(f"{media:.0f}%")
         heatmap_vals.append(row_vals)
         heatmap_text.append(row_text)
 
