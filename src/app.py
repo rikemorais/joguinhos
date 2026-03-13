@@ -496,5 +496,77 @@ with tab_camp:
         )
         st.plotly_chart(fig, use_container_width=True)
 
+    # ── MATRIZ H2H ──────────────────────────────────────────────────────────
+    st.markdown("---")
+    st.subheader("🔢 Como a Média foi Calculada")
+    st.caption("Cada célula mostra o % de vitórias do jogador da **linha** contra o jogador da **coluna**. A última coluna é a média — que define o ranking.")
+
+    jogadores_ord = ranking_df['Jogador'].tolist()
+    matriz = {}
+    for j in jogadores_ord:
+        matriz[j] = {}
+        h2h_rates = []
+        for oponente in jogadores_ord:
+            if j == oponente:
+                matriz[j][oponente] = None
+                continue
+            conf = df[
+                ((df['Nome 1'] == j) & (df['Nome 2'] == oponente)) |
+                ((df['Nome 1'] == oponente) & (df['Nome 2'] == j))
+            ]
+            if len(conf) > 0:
+                wins = len(conf[conf['Vencedor'] == j])
+                rate = round(wins / len(conf) * 100, 1)
+                matriz[j][oponente] = rate
+                h2h_rates.append(rate)
+            else:
+                matriz[j][oponente] = None
+
+    # Tabela visual com cores
+    heatmap_vals = []
+    heatmap_text = []
+    for j in jogadores_ord:
+        row_vals = []
+        row_text = []
+        for oponente in jogadores_ord:
+            val = matriz[j][oponente]
+            if j == oponente:
+                row_vals.append(None)
+                row_text.append("—")
+            elif val is None:
+                row_vals.append(None)
+                row_text.append("s/j")
+            else:
+                row_vals.append(val)
+                row_text.append(f"{val:.0f}%")
+        # Adiciona coluna da média
+        rates = [matriz[j][op] for op in jogadores_ord if op != j and matriz[j][op] is not None]
+        media = round(sum(rates) / len(rates), 1) if rates else 0.0
+        row_vals.append(media)
+        row_text.append(f"**{media:.0f}%**")
+        heatmap_vals.append(row_vals)
+        heatmap_text.append(row_text)
+
+    colunas = jogadores_ord + ['Média ⭐']
+    fig_heat = go.Figure(data=go.Heatmap(
+        z=heatmap_vals,
+        x=colunas,
+        y=jogadores_ord,
+        text=heatmap_text,
+        texttemplate="%{text}",
+        colorscale='RdYlGn',
+        zmin=0,
+        zmax=100,
+        showscale=True,
+        colorbar=dict(title='% Vitórias')
+    ))
+    fig_heat.update_layout(
+        xaxis_title='Adversário',
+        yaxis_title='Jogador',
+        yaxis=dict(autorange='reversed'),
+        height=max(300, len(jogadores_ord) * 55)
+    )
+    st.plotly_chart(fig_heat, use_container_width=True)
+
 st.markdown("---")
 st.caption("Dashboard eFootball - Dados de 2026")
