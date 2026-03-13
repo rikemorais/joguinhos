@@ -127,6 +127,154 @@ with tab1:
         fig.update_layout(showlegend=False)
         st.plotly_chart(fig, use_container_width=True)
 
+    # ── CHORD DIAGRAM ───────────────────────────────────────────────────────
+    st.markdown("---")
+    st.subheader("🎯 Confrontos entre Jogadores")
+    st.caption("Cada arco representa um jogador. As faixas conectando dois jogadores mostram quantas vezes se enfrentaram — quanto mais grossa, mais jogos. A cor indica o time mais usado pelo jogador.")
+
+    def make_chord(jogadores_list, data):
+        import numpy as np
+
+        n = len(jogadores_list)
+        idx = {j: i for i, j in enumerate(jogadores_list)}
+
+        # Matriz de confrontos
+        flow = [[0] * n for _ in range(n)]
+        for _, row in data.iterrows():
+            i = idx.get(row['Nome 1'])
+            j = idx.get(row['Nome 2'])
+            if i is not None and j is not None and i != j:
+                flow[i][j] += 1
+                flow[j][i] += 1
+
+        # Time mais usado por cada jogador
+        player_teams = {}
+        for jogador in jogadores_list:
+            t1 = data[data['Nome 1'] == jogador]['Time 1']
+            t2 = data[data['Nome 2'] == jogador]['Time 2']
+            all_t = pd.concat([t1, t2]).dropna()
+            player_teams[jogador] = all_t.mode()[0] if len(all_t) > 0 else '?'
+
+        # Cores por time
+        unique_teams = list(dict.fromkeys(player_teams[j] for j in jogadores_list))
+        palette = px.colors.qualitative.Plotly + px.colors.qualitative.D3
+        team_color = {t: palette[i % len(palette)] for i, t in enumerate(unique_teams)}
+
+        row_sums = [sum(flow[i]) for i in range(n)]
+        total = sum(row_sums)
+        if total == 0:
+            return go.Figure()
+
+        gap = 0.04
+        arc_sizes = [row_sums[i] / total * (2 * np.pi - n * gap) for i in range(n)]
+
+        starts = [0.0] * n
+        ends = [0.0] * n
+        angle = 0.0
+        for i in range(n):
+            starts[i] = angle
+            ends[i] = angle + arc_sizes[i]
+            angle = ends[i] + gap
+
+        # Sub-arcos para as faixas
+        sub_start = [[0.0] * n for _ in range(n)]
+        sub_end = [[0.0] * n for _ in range(n)]
+        for i in range(n):
+            if row_sums[i] == 0:
+                continue
+            cur = starts[i]
+            for j in range(n):
+                if i == j:
+                    continue
+                span = flow[i][j] / total * (2 * np.pi - n * gap)
+                sub_start[i][j] = cur
+                sub_end[i][j] = cur + span
+                cur += span
+
+        def arc_pts(a0, a1, r=1.0, pts=60):
+            t = np.linspace(a0, a1, pts)
+            return r * np.cos(t), r * np.sin(t)
+
+        def bezier(p0, p1, pts=60):
+            t = np.linspace(0, 1, pts)
+            cx, cy = 0.0, 0.0
+            x = (1 - t) ** 2 * p0[0] + 2 * (1 - t) * t * cx + t ** 2 * p1[0]
+            y = (1 - t) ** 2 * p0[1] + 2 * (1 - t) * t * cy + t ** 2 * p1[1]
+            return x, y
+
+        fig_chord = go.Figure()
+
+        # Faixas (ribbons)
+        for i in range(n):
+            for j in range(i + 1, n):
+                if flow[i][j] == 0:
+                    continue
+                color = team_color[player_teams[jogadores_list[i]]]
+                ax1, ay1 = arc_pts(sub_start[i][j], sub_end[i][j], r=0.97)
+                ax2, ay2 = arc_pts(sub_end[j][i], sub_start[j][i], r=0.97)
+                bx1, by1 = bezier((ax1[0], ay1[0]), (ax2[-1], ay2[-1]))
+                bx2, by2 = bezier((ax1[-1], ay1[-1]), (ax2[0], ay2[0]))
+                rx = np.concatenate([ax1, bx1, ax2, bx2[::-1]])
+                ry = np.concatenate([ay1, by1, ay2, by2[::-1]])
+                fig_chord.add_trace(go.Scatter(
+                    x=rx, y=ry,
+                    fill='toself',
+                    fillcolor=color,
+                    opacity=0.25,
+                    line=dict(width=0),
+                    mode='lines',
+                    hovertemplate=f"<b>{jogadores_list[i]}</b> vs <b>{jogadores_list[j]}</b><br>{flow[i][j]} jogos<extra></extra>",
+                    showlegend=False
+                ))
+
+        # Arcos dos jogadores
+        legend_shown = set()
+        for i, jogador in enumerate(jogadores_list):
+            color = team_color[player_teams[jogador]]
+            team = player_teams[jogador]
+            ax, ay = arc_pts(starts[i], ends[i], r=1.0)
+            iax, iay = arc_pts(ends[i], starts[i], r=0.90)
+            seg_x = np.concatenate([ax, iax, [ax[0]]])
+            seg_y = np.concatenate([ay, iay, [ay[0]]])
+            show_leg = team not in legend_shown
+            legend_shown.add(team)
+            fig_chord.add_trace(go.Scatter(
+                x=seg_x, y=seg_y,
+                fill='toself',
+                fillcolor=color,
+                opacity=0.9,
+                line=dict(width=1, color='white'),
+                mode='lines',
+                name=team,
+                legendgroup=team,
+                showlegend=show_leg,
+                hovertemplate=f"<b>{jogador}</b><br>Time favorito: {team}<extra></extra>"
+            ))
+            mid = (starts[i] + ends[i]) / 2
+            lx = 1.15 * np.cos(mid)
+            ly = 1.15 * np.sin(mid)
+            fig_chord.add_annotation(
+                x=lx, y=ly,
+                text=jogador,
+                showarrow=False,
+                font=dict(size=12, color='white'),
+                xanchor='left' if np.cos(mid) >= 0 else 'right'
+            )
+
+        fig_chord.update_layout(
+            xaxis=dict(showgrid=False, zeroline=False, showticklabels=False, range=[-1.5, 1.5]),
+            yaxis=dict(showgrid=False, zeroline=False, showticklabels=False, range=[-1.5, 1.5], scaleanchor='x'),
+            height=580,
+            plot_bgcolor='rgba(0,0,0,0)',
+            paper_bgcolor='rgba(0,0,0,0)',
+            legend_title_text='Time mais usado',
+            margin=dict(l=60, r=60, t=20, b=20)
+        )
+        return fig_chord
+
+    jogadores_chord = sorted(list(set(df['Nome 1'].unique()) | set(df['Nome 2'].unique())))
+    st.plotly_chart(make_chord(jogadores_chord, df), use_container_width=True)
+
 with tab2:
     col1, col2 = st.columns(2)
 
