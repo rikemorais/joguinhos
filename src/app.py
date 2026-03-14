@@ -517,7 +517,12 @@ with tab5:
     st.plotly_chart(fig, use_container_width=True)
 
     st.subheader("Todos os Jogos")
+    todos_times = sorted(set(df_filtrado['Time 1'].dropna()) | set(df_filtrado['Time 2'].dropna()))
+    time_filtro = st.selectbox("Filtrar por time", options=['Todos'] + todos_times)
+
     df_display = df_filtrado[['Data', 'Partida', 'Nome 1', 'Time 1', 'Placar 1', 'Nome 2', 'Time 2', 'Placar 2', 'Vencedor']].copy()
+    if time_filtro != 'Todos':
+        df_display = df_display[(df_display['Time 1'] == time_filtro) | (df_display['Time 2'] == time_filtro)]
     df_display['Data'] = df_display['Data'].dt.strftime('%d/%m/%Y')
     st.dataframe(df_display, use_container_width=True, hide_index=True)
 
