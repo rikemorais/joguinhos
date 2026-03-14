@@ -634,6 +634,56 @@ with tab_camp:
     fig.update_layout(showlegend=False, xaxis_title='Média de Vitórias H2H (%)')
     st.plotly_chart(fig, use_container_width=True)
 
+    # ── EVOLUÇÃO DO RANKING ──────────────────────────────────────────────────
+    st.markdown("---")
+    st.subheader("📈 Evolução do Ranking por Dia")
+    st.caption("Posição de cada jogador no ranking ao longo do tempo, recalculada a cada dia jogado.")
+
+    @st.cache_data(ttl=300)
+    def calcular_evolucao(_df):
+        jogadores = sorted(list(set(_df['Nome 1'].unique()) | set(_df['Nome 2'].unique())))
+        datas = sorted(_df['Data'].dt.date.unique())
+        registros = []
+
+        for data in datas:
+            df_ate = _df[_df['Data'].dt.date <= data]
+            # Calcula ranking acumulado até essa data
+            h2h_scores = {}
+            for jogador in jogadores:
+                outros = [j for j in jogadores if j != jogador]
+                h2h_rates = []
+                for oponente in outros:
+                    conf = df_ate[
+                        ((_df['Nome 1'] == jogador) & (_df['Nome 2'] == oponente)) |
+                        ((_df['Nome 1'] == oponente) & (_df['Nome 2'] == jogador))
+                    ]
+                    if len(conf) > 0:
+                        wins = len(conf[conf['Vencedor'] == jogador])
+                        decisivos = len(conf[conf['Vencedor'] != 'Empate'])
+                        if decisivos > 0:
+                            h2h_rates.append(wins / decisivos)
+                h2h_scores[jogador] = (sum(h2h_rates) / len(h2h_rates) * 100) if h2h_rates else 0.0
+
+            ranking_dia = sorted(h2h_scores.items(), key=lambda x: x[1], reverse=True)
+            for pos, (jogador, _) in enumerate(ranking_dia, start=1):
+                registros.append({'Data': data, 'Jogador': jogador, 'Posição': pos})
+
+        return pd.DataFrame(registros)
+
+    evolucao_df = calcular_evolucao(df)
+
+    fig_evo = px.line(
+        evolucao_df,
+        x='Data',
+        y='Posição',
+        color='Jogador',
+        markers=True,
+    )
+    fig_evo.update_yaxes(autorange='reversed', dtick=1, title='Posição no Ranking')
+    fig_evo.update_xaxes(title='Data')
+    fig_evo.update_layout(legend_title_text='Jogador')
+    st.plotly_chart(fig_evo, use_container_width=True)
+
     # ── DETALHAMENTO ────────────────────────────────────────────────────────
     st.markdown("---")
     st.subheader("📊 Detalhamento — Média de Vitórias")
