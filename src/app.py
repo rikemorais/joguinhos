@@ -526,9 +526,14 @@ with tab5:
         time_filtro = st.selectbox("Filtrar por time", options=['Todos'] + todos_times)
 
     df_display = df_filtrado[['Data', 'Partida', 'Nome 1', 'Time 1', 'Placar 1', 'Nome 2', 'Time 2', 'Placar 2', 'Vencedor']].copy()
-    if jogador_filtro != 'Todos':
+    if jogador_filtro != 'Todos' and time_filtro != 'Todos':
+        df_display = df_display[
+            ((df_display['Nome 1'] == jogador_filtro) & (df_display['Time 1'] == time_filtro)) |
+            ((df_display['Nome 2'] == jogador_filtro) & (df_display['Time 2'] == time_filtro))
+        ]
+    elif jogador_filtro != 'Todos':
         df_display = df_display[(df_display['Nome 1'] == jogador_filtro) | (df_display['Nome 2'] == jogador_filtro)]
-    if time_filtro != 'Todos':
+    elif time_filtro != 'Todos':
         df_display = df_display[(df_display['Time 1'] == time_filtro) | (df_display['Time 2'] == time_filtro)]
     st.caption(f"Total de partidas: **{len(df_display)}**")
     df_display['Data'] = df_display['Data'].dt.strftime('%d/%m/%Y')
