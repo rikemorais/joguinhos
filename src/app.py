@@ -523,6 +523,7 @@ with tab5:
     df_display = df_filtrado[['Data', 'Partida', 'Nome 1', 'Time 1', 'Placar 1', 'Nome 2', 'Time 2', 'Placar 2', 'Vencedor']].copy()
     if time_filtro != 'Todos':
         df_display = df_display[(df_display['Time 1'] == time_filtro) | (df_display['Time 2'] == time_filtro)]
+    st.caption(f"Total de partidas: **{len(df_display)}**")
     df_display['Data'] = df_display['Data'].dt.strftime('%d/%m/%Y')
     st.dataframe(df_display, use_container_width=True, hide_index=True)
 
