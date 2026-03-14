@@ -594,7 +594,24 @@ with tab_camp:
                 'Total': round(media_vitorias, 1)
             })
 
-        return pd.DataFrame(ranking).sort_values('Total', ascending=False).reset_index(drop=True)
+        from functools import cmp_to_key
+
+        def comparar(a, b):
+            if a['Total'] != b['Total']:
+                return -1 if a['Total'] > b['Total'] else 1
+            # Desempate: confronto direto entre os dois
+            conf = _df[
+                ((_df['Nome 1'] == a['Jogador']) & (_df['Nome 2'] == b['Jogador'])) |
+                ((_df['Nome 1'] == b['Jogador']) & (_df['Nome 2'] == a['Jogador']))
+            ]
+            decisivos = len(conf[conf['Vencedor'] != 'Empate'])
+            if decisivos == 0:
+                return 0
+            wins_a = len(conf[conf['Vencedor'] == a['Jogador']])
+            wins_b = len(conf[conf['Vencedor'] == b['Jogador']])
+            return -1 if wins_a > wins_b else (1 if wins_b > wins_a else 0)
+
+        return pd.DataFrame(sorted(ranking, key=cmp_to_key(comparar))).reset_index(drop=True)
 
     ranking_df = calcular_ranking(df)
 
@@ -664,7 +681,23 @@ with tab_camp:
                             h2h_rates.append(wins / decisivos)
                 h2h_scores[jogador] = (sum(h2h_rates) / len(h2h_rates) * 100) if h2h_rates else 0.0
 
-            ranking_dia = sorted(h2h_scores.items(), key=lambda x: x[1], reverse=True)
+            from functools import cmp_to_key
+
+            def comparar_dia(a, b):
+                if a[1] != b[1]:
+                    return -1 if a[1] > b[1] else 1
+                conf = df_ate[
+                    ((df_ate['Nome 1'] == a[0]) & (df_ate['Nome 2'] == b[0])) |
+                    ((df_ate['Nome 1'] == b[0]) & (df_ate['Nome 2'] == a[0]))
+                ]
+                decisivos = len(conf[conf['Vencedor'] != 'Empate'])
+                if decisivos == 0:
+                    return 0
+                wins_a = len(conf[conf['Vencedor'] == a[0]])
+                wins_b = len(conf[conf['Vencedor'] == b[0]])
+                return -1 if wins_a > wins_b else (1 if wins_b > wins_a else 0)
+
+            ranking_dia = sorted(h2h_scores.items(), key=cmp_to_key(comparar_dia))
             for pos, (jogador, _) in enumerate(ranking_dia, start=1):
                 registros.append({'Data': data, 'Jogador': jogador, 'Posição': pos})
 
