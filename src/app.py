@@ -673,6 +673,10 @@ with tab_camp:
                     h2h_rates.append(rate)
                 else:
                     matriz[j][oponente] = None
+            else:
+                matriz[j][oponente] = None
+                else:
+                    matriz[j][oponente] = None
     # Tabela visual com cores
     heatmap_vals = []
     heatmap_text = []
