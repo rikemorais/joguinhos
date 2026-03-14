@@ -675,8 +675,6 @@ with tab_camp:
                     matriz[j][oponente] = None
             else:
                 matriz[j][oponente] = None
-                else:
-                    matriz[j][oponente] = None
     # Tabela visual com cores
     heatmap_vals = []
     heatmap_text = []
