@@ -500,7 +500,8 @@ with tab5:
     with col2:
         data_fim = st.date_input("Data Fim", df['Data'].max())
 
-    df_filtrado = df[(df['Data'].dt.date >= data_inicio) & (df['Data'].dt.date <= data_fim)]
+    mask = df['Data'].isna() | ((df['Data'].dt.date >= data_inicio) & (df['Data'].dt.date <= data_fim))
+    df_filtrado = df[mask]
 
     st.metric("Jogos no período", len(df_filtrado))
 
