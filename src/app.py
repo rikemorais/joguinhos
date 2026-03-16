@@ -14,7 +14,7 @@ st.set_page_config(
 SHEET_ID = "1TG5d3HJ30_tItkz8urWjBxN3S_gYY8KB3zqk2vxcx-g"
 SHEET_NAME = "efootball - Dados"
 
-@st.cache_data(ttl=300)  # Recarrega a cada 5 minutos
+@st.cache_data(ttl=60)  # Recarrega a cada 1 minuto
 def load_data():
     url = f"https://docs.google.com/spreadsheets/d/{SHEET_ID}/gviz/tq?tqx=out:csv&sheet={quote(SHEET_NAME)}"
     df = pd.read_csv(url)
@@ -29,6 +29,9 @@ def load_data():
 df = load_data()
 
 st.title("⚽ eFootball Dashboard")
+if st.button("🔄 Atualizar dados"):
+    st.cache_data.clear()
+    st.rerun()
 st.markdown("---")
 
 # Métricas principais
