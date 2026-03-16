@@ -661,6 +661,7 @@ with tab_camp:
 
     @st.cache_data(ttl=300)
     def calcular_evolucao(_df):
+        _df = _df.dropna(subset=['Data'])
         jogadores = sorted(list(set(_df['Nome 1'].unique()) | set(_df['Nome 2'].unique())))
         datas = sorted(_df['Data'].dt.date.unique())
         registros = []
